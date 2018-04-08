@@ -36,10 +36,11 @@ data_transforms = transforms.Compose([
 def get_image_feature(photo_id):
 	path = "../yelp_data/train_photos/{}.jpg".format(photo_id)
 	photo = Image.open(path)
-	photo = Variable(data_transforms(photo).unsqueeze(0), requires_grad=False)
+	photo = data_transforms(photo).unsqueeze(0)
 	if torch.cuda.is_available():
 		model.cuda()
 		photo.cuda()
+	photo = Variable(photo, requires_grad=False)
 	x = model(photo)
 	x = x.view(x.size(0), -1)
 	data = x.data.numpy()[0]
