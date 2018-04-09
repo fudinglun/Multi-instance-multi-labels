@@ -12,6 +12,7 @@ import csv
 from image_feature_extraction import get_image_feature
 import pdb
 from sklearn.model_selection import train_test_split
+import datetime
 
 
 
@@ -66,36 +67,41 @@ class BaseLine(nn.Module):
 
 model = BaseLine()
 if torch.cuda.is_available():
+	print("GPU is available")
 	model.cuda()
 
 optimizer = optim.SGD(model.parameters(), lr=0.1)
 
 
 
-def train():
+def train(epoch):
 	model.train()
-	for key in train_key:
-		x = np.array([])
-		y = target_value[key]
-		ids = np.random.choice(input_value[key], 8)
-		for i in ids:
-			data = get_image_feature(i)
-			x = np.concatenate((x, data))
-		x = torch.from_numpy(x).float()
-		y = torch.from_numpy(y).float()
-		if torch.cuda.is_available():
-			x = x.cuda()
-			y = y.cuda()
-		x, y = Variable(x), Variable(y)
-		optimizer.zero_grad()
-		output = model(x)
-		loss = F.binary_cross_entropy(output, y)
-		loss.backward()
-		optimizer.step()
-		print(loss.data[0])
+	for e in range(epoch):
+		for key in train_key:
+			x = np.array([])
+			y = target_value[key]
+			ids = np.random.choice(input_value[key], 8)
+			for i in ids:
+				data = get_image_feature(i)
+				x = np.concatenate((x, data))
+			x = torch.from_numpy(x).float()
+			y = torch.from_numpy(y).float()
+			if torch.cuda.is_available():
+				x = x.cuda()
+				y = y.cuda()
+			x, y = Variable(x), Variable(y)
+			optimizer.zero_grad()
+			output = model(x)
+			loss = F.binary_cross_entropy(output, y)
+			loss.backward()
+			optimizer.step()
+			print(loss.data[0])
+		now = datetime.datetime.now()
+		torch.save(model.state_dict(), "model{}.pt".format(str(now.date())))
+		print("finish epoch {}".format(e))
 
 
-train()
+train(5)
 
 
 
