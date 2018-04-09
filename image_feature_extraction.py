@@ -25,6 +25,9 @@ model = nn.Sequential(model_conv.conv1,
 	model_conv.layer4,
 	model_conv.avgpool)
 
+if torch.cuda.is_available():
+	model = model.cuda()
+	print("Set pretrained model cuda")
 
 data_transforms = transforms.Compose([
         transforms.RandomResizedCrop(224),
@@ -38,10 +41,9 @@ def get_image_feature(photo_id):
 	photo = Image.open(path)
 	photo = data_transforms(photo).unsqueeze(0)
 	if torch.cuda.is_available():
-		model.cuda()
-		photo.cuda()
+		photo = photo.cuda()
 	photo = Variable(photo, requires_grad=False)
 	x = model(photo)
 	x = x.view(x.size(0), -1)
-	data = x.data.numpy()[0]
+	data = x.data.cpu().numpy()[0]
 	return data

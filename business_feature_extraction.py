@@ -66,42 +66,49 @@ class BaseLine(nn.Module):
 
 
 model = BaseLine()
+# model.load_state_dict(torch.load("model2018-04-09.pt"))
 if torch.cuda.is_available():
 	print("GPU is available")
-	model.cuda()
+	model = model.cuda()
 
-optimizer = optim.SGD(model.parameters(), lr=0.1)
+optimizer = optim.Adam(model.parameters())
+criteria = nn.BCELoss()
 
 
-
-def train(epoch):
+def train_baseline(epoch):
 	model.train()
 	for e in range(epoch):
+		j = 0
+		running_loss = 0.0
 		for key in train_key:
-			x = np.array([])
-			y = target_value[key]
-			ids = np.random.choice(input_value[key], 8)
-			for i in ids:
-				data = get_image_feature(i)
-				x = np.concatenate((x, data))
-			x = torch.from_numpy(x).float()
-			y = torch.from_numpy(y).float()
-			if torch.cuda.is_available():
-				x = x.cuda()
-				y = y.cuda()
-			x, y = Variable(x), Variable(y)
-			optimizer.zero_grad()
-			output = model(x)
-			loss = F.binary_cross_entropy(output, y)
-			loss.backward()
-			optimizer.step()
-			print(loss.data[0])
+			for num in range(len(input_value[key]) // 8 + 1):
+				x = np.array([])
+				y = target_value[key]
+				ids = np.random.choice(input_value[key], 8)
+				for i in ids:
+					data = get_image_feature(i)
+					x = np.concatenate((x, data))
+				x = torch.from_numpy(x).float()
+				y = torch.from_numpy(y).float()
+				if torch.cuda.is_available():
+					x = x.cuda()
+					y = y.cuda()
+				x, y = Variable(x), Variable(y)
+				optimizer.zero_grad()
+				output = model(x)
+				loss = criteria(output, y)
+				loss.backward()
+				optimizer.step()
+			print("epoch: {}, key: {}, with loss: {}".format(e, j, loss.data[0]))
+			running_loss += loss.data[0]
+			j += 1
 		now = datetime.datetime.now()
 		torch.save(model.state_dict(), "model{}.pt".format(str(now.date())))
 		print("finish epoch {}".format(e))
+		print("Loss of this epoch is {}".format(running_loss/2000))
 
 
-train(5)
+train_baseline(5)
 
 
 
