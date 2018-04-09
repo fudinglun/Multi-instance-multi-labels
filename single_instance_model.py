@@ -131,7 +131,9 @@ for e in range(epoch):
 				if count % 200 == 0:
 					print("Epoch: {}, iteration: {}, average loss: {}".format(e, count, running_loss / 200))
 					running_loss = 0.0
-
+				if count % 2000 == 0:
+					now = datetime.datetime.now()
+					torch.save(model.state_dict(), "single_instance_model{}.pt".format(str(now.date())))
 			except csv.Error:
 				print("Error")
 			except StopIteration:
