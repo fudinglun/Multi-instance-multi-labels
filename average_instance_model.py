@@ -13,6 +13,20 @@ import datetime
 
 INPUT_PATH = "../yelp_data/train_photo_to_biz_ids.csv"
 
+def input_value_extraction(path):
+	dic = {}
+	with open(path) as f:
+		next(f)
+		reader = csv.reader(f, delimiter=',')
+		for row in reader:
+			photo = row[0]
+			buz = row[1]
+			if buz in dic:
+				dic[buz].append(photo)
+			else:
+				dic[buz] = [photo]
+	return dic
+
 
 def target_value_extract(path):
 	dic = {}
@@ -28,7 +42,6 @@ def target_value_extract(path):
 				y[int(i)] = 1
 			dic[row[0]] = y
 	return dic
-
 
 def get_pretrained_model():
 	model_conv = torchvision.models.resnet152(pretrained=True)
@@ -72,10 +85,9 @@ def get_image_features(ids, model, data_transforms):
 	x = x.view(x.size(0), -1)
 	return x.data
 
-
-class SingleInstanceBaseLine(nn.Module):
+class AverageInstanceBaseLine(nn.Module):
 	def __init__(self):
-		super(SingleInstanceBaseLine, self).__init__()
+		super(AverageInstanceBaseLine, self).__init__()
 		self.fc1 = nn.Linear(2048, 9)
 		self.sig = nn.Sigmoid()
 
@@ -85,60 +97,42 @@ class SingleInstanceBaseLine(nn.Module):
 
 
 
-
 target_value = target_value_extract("../yelp_data/train.csv")
-model = SingleInstanceBaseLine()
-model.load_state_dict(torch.load("single_instance_model2018-04-09.pt"))
+input_value = input_value_extraction(INPUT_PATH)
+keys = list(target_value.keys())
+model = AverageInstanceBaseLine()
 if torch.cuda.is_available():
   print("GPU is available")
   model = model.cuda()
 
-optimizer = optim.Adam(model.parameters())
+optimizer = optim.Adam(model.parameters(), lr=0.01)
 criteria = nn.BCELoss()
 
-
 epoch = 5
-batch_size = 10
 pretrained_model = get_pretrained_model()
 transforms = get_transform()
 for e in range(epoch):
-	with open(INPUT_PATH) as f:
-		next(f)
-		reader = csv.reader(f, delimiter=',')
-		count = 0
-		running_loss = 0.0
-		while True:
-			try: 
-				ids = []
-				targets = []
-				for b in range(batch_size):
-					photo_id, buz_id = next(reader)
-					ids.append(photo_id)
-					targets.append(target_value[buz_id])
-				x = get_image_features(ids, pretrained_model, transforms)
-				y = torch.from_numpy(np.vstack(targets)).float()
-				if torch.cuda.is_available():
-					x = x.cuda()
-					y = y.cuda()
-				x, y = Variable(x), Variable(y)
-				optimizer.zero_grad()
-				output = model(x)
-				loss = criteria(output, y)
-				loss.backward()
-				optimizer.step()
-				running_loss += loss.data[0]
-				count += 1
-				if count % 200 == 0:
-					print("Epoch: {}, iteration: {}, average loss: {}".format(e, count, running_loss / 200))
-					running_loss = 0.0
-				if count % 2000 == 0:
-					now = datetime.datetime.now()
-					torch.save(model.state_dict(), "single_instance_model{}.pt".format(str(now.date())))
-			except csv.Error:
-				print("Error")
-			except StopIteration:
-				print("Iteration End")
-				break
+	count = 0
+	for key in keys:
+		ids = input_value[key]
+		x = get_image_features(ids, pretrained_model, transforms)
+		y = target_value[key]
+		y = torch.from_numpy(y).float()
+		if torch.cuda.is_available():
+			x = x.cuda()
+			y = y.cuda()
+		x = torch.mean(x, 0)
+		x, y = Variable(x), Variable(y)
+		optimizer.zero_grad()
+		output = model(x)
+		loss = criteria(output, y)
+		loss.backward()
+		optimizer.step()
+		print("Epoch: {}, iteration: {}, loss: {}".format(e, count, loss.data[0]))
+		count += 1
+
+
+
 
 
 
