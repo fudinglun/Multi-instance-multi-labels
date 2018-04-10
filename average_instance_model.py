@@ -108,7 +108,7 @@ if torch.cuda.is_available():
 optimizer = optim.Adam(model.parameters(), lr=0.01)
 criteria = nn.BCELoss()
 
-epoch = 5
+epoch = 10
 pretrained_model = get_pretrained_model()
 transforms = get_transform()
 for e in range(epoch):
@@ -130,6 +130,8 @@ for e in range(epoch):
 		optimizer.step()
 		print("Epoch: {}, iteration: {}, loss: {}".format(e, count, loss.data[0]))
 		count += 1
+	now = datetime.datetime.now()
+	torch.save(model.state_dict(), "average_instance_model{}.pt".format(str(now.date())))
 
 
 
