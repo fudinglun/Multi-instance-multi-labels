@@ -129,7 +129,6 @@ for e in range(epoch):
 	for key in keys:
 		ids = input_value[key]
 		x = get_business_feature(ids, pretrained_model, transforms)
-		pdb.set_trace()
 		x = x/len(ids)
 		y = target_value[key]
 		y = torch.from_numpy(y).float()
