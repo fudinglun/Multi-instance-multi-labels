@@ -85,6 +85,19 @@ def get_image_features(ids, model, data_transforms):
 	x = x.view(x.size(0), -1)
 	return x.data
 
+def get_business_feature(ids, model, data_transforms):
+	if len(ids) > 100:
+		x = get_image_features(ids[:100], model, data_transforms)
+		x = torch.sum(x, 0)
+		more = get_business_feature(ids[100:], model, data_transforms)
+		x = torch.add(x, 1, more)
+		return x
+	else:
+		x = get_image_features(ids, model, data_transforms)
+		x = torch.sum(x, 0)
+		return x
+
+
 class AverageInstanceBaseLine(nn.Module):
 	def __init__(self):
 		super(AverageInstanceBaseLine, self).__init__()
@@ -115,13 +128,14 @@ for e in range(epoch):
 	count = 0
 	for key in keys:
 		ids = input_value[key]
-		x = get_image_features(ids, pretrained_model, transforms)
+		x = get_business_feature(ids, pretrained_model, transforms)
+		pdb.set_trace()
+		x = x/len(ids)
 		y = target_value[key]
 		y = torch.from_numpy(y).float()
 		if torch.cuda.is_available():
 			x = x.cuda()
 			y = y.cuda()
-		x = torch.mean(x, 0)
 		x, y = Variable(x), Variable(y)
 		optimizer.zero_grad()
 		output = model(x)
