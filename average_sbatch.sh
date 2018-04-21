@@ -7,8 +7,8 @@
 #SBATCH --job-name=Yelp
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=df1777@nyu.edu
-#SBATCH --output=average_%j.out
-#SBATCH --error=average_%j.err
+#SBATCH --output=minmax_%j.out
+#SBATCH --error=minmax_%j.err
 #SBATCH --gres=gpu:1
 
 module purge
