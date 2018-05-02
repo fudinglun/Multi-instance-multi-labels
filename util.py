@@ -68,7 +68,18 @@ def get_image_features(ids, model, data_transforms):
 	x = x.view(x.size(0), -1)
 	return x.data
 
-
+def get_raw_image_features(ids, model, data_transforms):
+	images = []
+	for i in ids:
+		path = "../yelp_data/train_photos/{}.jpg".format(i)
+		photo = data_transforms(Image.open(path))
+		images.append(photo)
+	images = torch.stack(images)
+	if torch.cuda.is_available():
+		images = images.cuda()
+	images = Variable(images, requires_grad=False)
+	x = model(images)
+	return x.data
 
 """
 Get selected pretrained model
@@ -76,8 +87,30 @@ Get selected pretrained model
 def get_pretrained_model(name="resenet152"):
 	if name == "resenet152":
 		return get_pretrained_resnet152()
+	elif name == "resnet152_b":
+		return get_pretrained_resnet152_b()
 
+"""
+Get pretrained resnet152_b
+"""
+def get_pretrained_resnet152_b():
+	model_conv = torchvision.models.resnet152(pretrained=True)
+	for param in model_conv.parameters():
+		param.requires_grad = False
 
+	model = nn.Sequential(model_conv.conv1,
+		model_conv.bn1,
+		model_conv.relu,
+		model_conv.maxpool,
+		model_conv.layer1,
+		model_conv.layer2,
+		model_conv.layer3,
+		model_conv.layer4)
+
+	if torch.cuda.is_available():
+		model = model.cuda()
+		print("Set pretrained model cuda")
+	return model
 
 
 """
