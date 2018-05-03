@@ -68,11 +68,34 @@ class MultiKernelCNN(nn.Module):
 		result = self.sigmoid(self.fc(result))
 		return result
 
+class ResCNN(nn.Module):
+	def __init__(self):
+		super(ResCNN, self).__init__()
+		self.layer1 = nn.Sequential(nn.Conv2d(2048, 512, 3),nn.ReLU(),nn.MaxPool2d(2))
+		self.avgpool = nn.AvgPool2d(7, stride=1)
+		self.fc = nn.Linear(512*2*2, 9)
+		self.sigmoid = nn.Sigmoid()
+		self.init_weight()
+
+
+	def forward(self, x):
+		residual = self.avgpool(x).squeeze(-1).squeeze(-1)
+		result = self.layer1(x)
+		result = result.view(x.size(0), -1)
+		result = result + residual
+		result = self.sigmoid(self.fc(result))
+		return result
+
+	def init_weight(self):
+		for m in self.modules():
+			if isinstance(m, nn.Conv2d):
+				m.weight.data.normal_(0.0, 0.02)
+
 
 target_value = target_value_extract("../yelp_data/train.csv")
 input_value = input_value_extraction(INPUT_PATH)
 keys = list(target_value.keys())
-model = MultiKernelCNN()
+model = ResCNN()
 if torch.cuda.is_available():
   print("GPU is available")
   model = model.cuda()
@@ -84,8 +107,8 @@ criteria = nn.BCELoss()
 
 buz_memory = {}
 
-print("Multi Kernel CNN Research Model running")
-epoch = 200
+print("Residual CNN Research Model running")
+epoch = 100
 pretrained_model = get_pretrained_model("resnet152_b")
 transforms = get_transform()
 
@@ -137,7 +160,7 @@ def evaluation(model):
 for e in range(epoch):
 	model.train()
 	for batch in range(60):
-		key_pool = keys[batch*3:(batch+1)*3]
+		key_pool = keys[batch*25:(batch+1)*25]
 		x_batch = []
 		y_batch = []
 		for key in key_pool:
@@ -166,9 +189,9 @@ for e in range(epoch):
 		print("Epoch: {}, Iteration: {}, Loss: {}".format(e, batch, loss.data[0]))
 	# 	break
 	# continue
-	if e % 20 == 0:
-		now = datetime.datetime.now()
-		torch.save(model.state_dict(), "MultiKernel_CNN_model_epoch{}_{}.pt".format(e, str(now.date())))
+	if e % 10 == 0:
+		# now = datetime.datetime.now()
+		# torch.save(model.state_dict(), "MultiKernel_CNN_model_epoch{}_{}.pt".format(e, str(now.date())))
 		evaluation(model)
 
 
