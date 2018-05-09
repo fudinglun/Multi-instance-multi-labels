@@ -10,7 +10,7 @@ from PIL import Image
 import pdb
 import csv
 import datetime
-from util import input_value_extraction, target_value_extract, get_pretrained_model, get_raw_image_features
+from util import input_value_extraction, target_value_extract, get_pretrained_model, get_raw_image_features, calculate_f1
 import pickle
 
 INPUT_PATH = "../yelp_data/train_photo_to_biz_ids.csv"
@@ -95,7 +95,7 @@ class ResCNN(nn.Module):
 target_value = target_value_extract("../yelp_data/train.csv")
 input_value = input_value_extraction(INPUT_PATH)
 keys = list(target_value.keys())
-model = ResCNN()
+model = CNN()
 if torch.cuda.is_available():
   print("GPU is available")
   model = model.cuda()
@@ -107,8 +107,8 @@ criteria = nn.BCELoss()
 
 buz_memory = {}
 
-print("Residual CNN Research Model running")
-epoch = 100
+print("CNN Research Model running")
+epoch = 40
 pretrained_model = get_pretrained_model("resnet152_b")
 transforms = get_transform()
 
@@ -157,42 +157,93 @@ def evaluation(model):
 	for t in range(len(thresholds)):
 		print("Validation: Threhods: {}, recall: {}, precision: {}".format(thresholds[t], result[t][0]/total, result[t][1]/total))
 
-for e in range(epoch):
-	model.train()
-	for batch in range(60):
-		key_pool = keys[batch*25:(batch+1)*25]
-		x_batch = []
-		y_batch = []
-		for key in key_pool:
-			if key in buz_memory:
-				x = buz_memory[key]
-			else:
-				ids = input_value[key]
-				x = pickle.load(open("buz_cache/{}.p".format(key), "rb"))
-				# x = get_business_feature(ids, pretrained_model, transforms)/len(ids)
-				buz_memory[key] = x
-			y = target_value[key]
-			y = torch.from_numpy(y).float()
-			x_batch.append(x)
-			y_batch.append(y)
-		x_batch = torch.stack(x_batch)
-		y_batch = torch.stack(y_batch)
+def evaluation_mean_f1(model):
+	print("Start Testing")
+	model.eval()
+	thresholds = [0.3,0.4,0.5]
+	result = [[[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]]],
+	[[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]]],
+	[[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]],[[0,0],[0,0]]]]
+	for i in range(1500, 2000):
+		key = keys[i]
+		if key in buz_memory:
+			x = buz_memory[key]
+		else:
+			ids = input_value[key]
+			# x = get_business_feature(ids, pretrained_model, transforms)/len(ids)
+			x = pickle.load(open("buz_cache/{}.p".format(key), "rb"))
+			buz_memory[key] = x
+		y = target_value[key]
+		x = [x]
+		x = torch.stack(x)
 		if torch.cuda.is_available():
-			x_batch = x_batch.cuda()
-			y_batch = y_batch.cuda()
-		x_batch, y_batch = Variable(x_batch), Variable(y_batch)
-		optimizer.zero_grad()
-		output = model(x_batch)
-		loss = criteria(output, y_batch)
-		loss.backward()
-		optimizer.step()
-		print("Epoch: {}, Iteration: {}, Loss: {}".format(e, batch, loss.data[0]))
-	# 	break
-	# continue
-	if e % 10 == 0:
-		# now = datetime.datetime.now()
-		# torch.save(model.state_dict(), "MultiKernel_CNN_model_epoch{}_{}.pt".format(e, str(now.date())))
-		evaluation(model)
+			x = x.cuda()
+		x = Variable(x)
+		output = model(x)
+		output = output.cpu()
+		for t in range(len(thresholds)):
+			for i in range(9):
+				#recall count
+				if y[i] == 1:
+					result[t][i][0][1] += 1
+					if output.data[0][i] >= thresholds[t]:
+						result[t][i][0][0] += 1
+				#precision count
+				if output.data[0][i] >= thresholds[t]:
+					result[t][i][1][1] += 1
+					if y[i] == 1:
+						result[t][i][1][0] += 1
+	for t in range(len(thresholds)):
+		mean_f1 = 0
+		for i in range(9):
+			recall = result[t][i][0][0] / result[t][i][0][1]
+			precision = result[t][i][1][0] / result[t][i][1][1]
+			mean_f1 += calculate_f1(recall, precision)
+			if t == 1:
+				print("Threshod is 0.4")
+				print("Feature: {}, f1: {}".format(i, calculate_f1(recall, precision)))
+		print("threshold: {}, mean_f1: {}".format(thresholds[t], mean_f1/9))
+
+for m in ["CNN_model_epoch20_2018-05-02.pt"]:
+	model.load_state_dict(torch.load(m))
+	print(m)
+	evaluation_mean_f1(model)
+# for e in range(epoch):
+# 	model.train()
+# 	for batch in range(60):
+# 		key_pool = keys[batch*25:(batch+1)*25]
+# 		x_batch = []
+# 		y_batch = []
+# 		for key in key_pool:
+# 			if key in buz_memory:
+# 				x = buz_memory[key]
+# 			else:
+# 				ids = input_value[key]
+# 				x = pickle.load(open("buz_cache/{}.p".format(key), "rb"))
+# 				# x = get_business_feature(ids, pretrained_model, transforms)/len(ids)
+# 				buz_memory[key] = x
+# 			y = target_value[key]
+# 			y = torch.from_numpy(y).float()
+# 			x_batch.append(x)
+# 			y_batch.append(y)
+# 		x_batch = torch.stack(x_batch)
+# 		y_batch = torch.stack(y_batch)
+# 		if torch.cuda.is_available():
+# 			x_batch = x_batch.cuda()
+# 			y_batch = y_batch.cuda()
+# 		x_batch, y_batch = Variable(x_batch), Variable(y_batch)
+# 		optimizer.zero_grad()
+# 		output = model(x_batch)
+# 		loss = criteria(output, y_batch)
+# 		loss.backward()
+# 		optimizer.step()
+# 		print("Epoch: {}, Iteration: {}, Loss: {}".format(e, batch, loss.data[0]))
+# 	# 	break
+# 	# continue
+# 	if e % 2 == 0:
+# 		# now = datetime.datetime.now()
+# 		# torch.save(model.state_dict(), "MultiKernel_CNN_model_epoch{}_{}.pt".format(e, str(now.date())))
+# 		evaluation(model)
 
 
 

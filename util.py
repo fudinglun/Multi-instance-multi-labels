@@ -13,6 +13,12 @@ import datetime
 
 
 """
+calculate f1
+"""
+def calculate_f1(recall, precision):
+	return 2*recall*precision/(recall + precision)
+
+"""
 Given a path, usual: INPUT_PATH = "../yelp_data/train_photo_to_biz_ids.csv"
 return a dictionary map a business id to a list of photo ids
 """
